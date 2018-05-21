@@ -12,17 +12,17 @@ On the client side, please run
 ```python
 .../tinyftp$ python client.py [server_ip]
 ```
-When connected, subcommand on the client side might be like {list,get,put} [fileordirectory]
+When connected, subcommand on the client side might be like {list,get,put,cd,lcd,pwd,lpwd} [fileordirectory]
 
 Some examples may be
 
 ```
-Tinyftp>>>list D:\temp\
-Tinyftp>>>get D:\temp\a.txt
+Tinyftp>>>list
+Tinyftp>>>get a.txt
 Tinyftp>>>put a.txt
 ```
 
 #### Note
-* the working directory for server side or client side will be added soon
+* double dots path like /../ could not be resolved
 
 

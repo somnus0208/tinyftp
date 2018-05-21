@@ -1,19 +1,21 @@
 import argparse
 import socket
 import struct
-RES_CMD_OK = 1
-RES_DIR = 2
-RES_FILE_SIZE = 8
-RES_FILE_BEG = 9
-RES_FILE_END = 10
-RES_FILE_BUF = 3
-RES_ERROR = 4
-RES_UPL_FILE_OK = 11
+RES_CMD_OK       = 1
+RES_DIR          = 2
+RES_FILE_SIZE    = 3
+RES_FILE_BEG     = 4
+RES_FILE_END     = 5
+RES_FILE_BUF     = 6
+RES_ERROR        = 7
+RES_UPL_FILE_OK  = 8
 
-REQ_DIR = 5
-REQ_FILE = 6
-REQ_UPL_FILE = 7
-REQ_CLS = 12
+REQ_W_DIR_CHANGE = 9 
+REQ_W_DIR        = 10
+REQ_DIR          = 11
+REQ_FILE         = 12
+REQ_UPL_FILE     = 13
+REQ_CLS          = 14
 
 class TLV:
     def __init__(self,tag,val=None):
@@ -31,16 +33,9 @@ class TLV:
             return struct.pack('ii',self.tag,self.length) + self.val
         return struct.pack('ii',self.tag,self.length)
 
-class ArgumentParserError(Exception): pass
-
-
-class ThrowingArgumentParser(argparse.ArgumentParser):
-    def error(self, message):
-        raise ArgumentParserError(message)
-    def exit(self, status=0, message=None):
-        pass
-
 class tlvsocket:
+    
+    working_dir = None
     def __init__(self, family=socket.AF_INET, type=socket.SOCK_STREAM, proto=0, fileno=None):
         self._socket = socket.socket(family,type,proto,fileno)
     def accept(self):
@@ -48,13 +43,13 @@ class tlvsocket:
         tlvs = tlvsocket()
         tlvs._socket = s
         return tlvs,addr  
-    def sendtlv(self,tlv):
+    def send_tlv(self,tlv):
         if isinstance(tlv,TLV):
             self._socket.sendall(bytes(tlv))
         else:
             raise TypeError
 
-    def recvtlv(self):
+    def recv_tlv(self):
         tag,length = struct.unpack('ii',self._socket.recv(8))
         if tag==RES_FILE_BUF:
             val = self._socket.recv(length)

@@ -4,71 +4,128 @@ import argparse
 import struct
 import tls
 import sys
-    
+
+class ArgumentParserError(Exception): pass
+
+
+class ThrowingArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        raise ArgumentParserError(message)
+    def exit(self, status=0, message=None):
+        pass
+
+def command_cd(client, args):
+    tlv = tls.TLV(tls.REQ_W_DIR_CHANGE, args.param)
+    print(args.param)
+    client.send_tlv(tlv)
+    tlv = client.recv_tlv()
+    if tlv.tag == tls.RES_ERROR:
+        print('error: {}'.format(tlv.val))
+
+def command_lcd(client, args):
+    nw_dir = client.working_dir
+    if os.path.abspath(args.param):
+        nw_dir = args.param
+    else:
+        nw_dir = os.path.join(nw_dir,args.param)
+    try:
+        os.listdir(nw_dir)
+        client.working_dir = nw_dir
+    except FileNotFoundError:
+        print('error: no such file or directory:{0}'.format(args.param))
+def command_pwd(client, args):
+    tlv = tls.TLV(tls.REQ_W_DIR)
+    client.send_tlv(tlv)
+    tlv = client.recv_tlv()
+    if tlv.tag == tls.RES_ERROR:
+        print('error: {}'.format(tlv.val))
+    elif tlv.tag == tls.RES_CMD_OK:
+        print('remote:{0}'.format(tlv.val))
+
+def command_lpwd(client, args):
+    print(client.working_dir)
+
+def command_lst(client, args):
+    tlv = tls.TLV(tls.REQ_DIR)
+    client.send_tlv(tlv)
+    tlv = client.recv_tlv()
+    if tlv.tag == tls.RES_ERROR:
+        print('error:{}'.format(tlv.val))
+    elif tlv.tag == tls.RES_DIR:
+        print(tlv.val)
+
+def command_put(args):
+    print("upload")
+
+def command_get(client, args):
+    tlv = tls.TLV(tls.REQ_FILE,args.param)
+    client.send_tlv(tlv)
+    tlv = client.recv_tlv()
+    if tlv.tag == tls.RES_ERROR:
+        print('Error:{}'.format(tlv.val))
+    elif tlv.tag == tls.RES_FILE_BEG:
+        w_dir = client.working_dir
+        file_name = tlv.val
+        file_abs_name = os.path.join(w_dir,file_name)
+        file_object = open(file_abs_name, 'wb')
+        tlv = client.recv_tlv()
+        if tlv.tag == tls.RES_FILE_SIZE:
+            eval(tlv.val)
+        tlv = client.recv_tlv()
+        while tlv.tag!=tls.RES_FILE_END:
+            file_object.write(tlv.val)
+            tlv = client.recv_tlv()
+        file_object.close()
+
+def command_cls(client, args):
+    client.send_tlv(tls.TLV(tls.REQ_CLS))
+    sys.exit()
 
 if __name__=='__main__':
     mainparser = argparse.ArgumentParser()
     mainparser.add_argument('serverip')
     addr = (mainparser.parse_args().serverip,9000)
     client = tls.tlvsocket()
+    client.working_dir = os.getcwd()
     client.connect(addr)
     print('server {} connected'.format(addr[0]))
-    parser = tls.ThrowingArgumentParser(prog='',add_help=False)
-    parser.add_argument('action',choices=['list','get','put'])
-    parser.add_argument('param',metavar='fileordirectory')
-    while True:
-        try:
-            subcmd = input('Tinyftp>>>')
-            if (subcmd=='close'):
-                client.sendtlv(tls.TLV(tls.REQ_CLS))
-                sys.exit()
-            args = parser.parse_args(subcmd.split())
-            tlv = None
-            if args.action=='list':
-                tlv = tls.TLV(tls.REQ_DIR,args.param)
-            elif args.action=='get':
-                tlv = tls.TLV(tls.REQ_FILE,args.param)
-            elif args.action=='put':
-                tlv = tls.TLV(tls.REQ_UPL_FILE)
-                try:
-                    os.stat(args.param)
-                except FileNotFoundError:
-                    print('{0} not Found'.format(args.param))
-                    continue
-            client.sendtlv(tlv)
-        except tls.ArgumentParserError:
-            parser.print_usage()
-            continue
+    parser = ThrowingArgumentParser(description='tiny ftp client')
+    subparsers = parser.add_subparsers()
 
-        tlv = client.recvtlv()
-        if tlv.tag == tls.RES_ERROR:
-            print('Error:{}'.format(tlv.val))
-        elif tlv.tag == tls.RES_DIR:
-            print(tlv.val)
-        elif tlv.tag == tls.RES_FILE_BEG:
-            file_abs_name = tlv.val
-            file_name = os.path.basename(file_abs_name)
-            file_object = open(file_name,'wb')
-            tlv = client.recvtlv()
-            if tlv.tag == tls.RES_FILE_SIZE:
-                file_size = eval(tlv.val)
-            tlv = client.recvtlv()
-            while tlv.tag!=tls.RES_FILE_END:
-                file_object.write(tlv.val)
-                tlv = client.recvtlv()
-            print('receiving {} completed'.format(file_name))
-            file_object.close()
-        elif tlv.tag == tls.RES_UPL_FILE_OK:
-            file_abs_name = args.param
-            file_name = os.path.basename(file_abs_name)
-            file_size = str(os.stat(file_abs_name).st_size)
-            client.sendtlv(tls.TLV(tls.RES_FILE_BEG,file_name))        
-            client.sendtlv(tls.TLV(tls.RES_FILE_SIZE,file_size))   
-            file_object = open(file_abs_name, 'rb')
-            buff = file_object.read(1024)
-            while (buff):
-                client.sendtlv(tls.TLV(tls.RES_FILE_BUF,buff))
-                buff = file_object.read(1024)
-            client.sendtlv(tls.TLV(tls.RES_FILE_END))
-            print('sending {} completed'.format(file_name))
-        
+    parser_pwd = subparsers.add_parser('close', help='close this connection')
+    parser_pwd.set_defaults(handler=command_cls)
+
+    parser_pwd = subparsers.add_parser('pwd', help='print name of working directory')
+    parser_pwd.set_defaults(handler=command_pwd)
+
+    parser_lpwd = subparsers.add_parser('lpwd', help='print name of local working directory')
+    parser_lpwd.set_defaults(handler=command_lpwd)
+
+    parser_cd = subparsers.add_parser('cd', help='change remote working directory')
+    parser_cd.add_argument('param',metavar='directory')
+    parser_cd.set_defaults(handler=command_cd)
+
+    parser_lcd = subparsers.add_parser('lcd', help='changes local working directory')
+    parser_lcd.add_argument('param',metavar='directory')
+    parser_lcd.set_defaults(handler=command_lcd)
+
+    parser_lst = subparsers.add_parser('list', help='returns information of working directory')
+    parser_lst.set_defaults(handler=command_lst)
+
+    parser_put = subparsers.add_parser('put', help='uploads file')
+    parser_put.add_argument('param',metavar='file')
+    parser_put.set_defaults(handler=command_put)
+
+    parser_get = subparsers.add_parser('get', help='downloads file')
+    parser_get.add_argument('param',metavar='file')
+    parser_get.set_defaults(handler=command_get)
+
+    while True:
+        sub_cmd = input('Tinyftp>>>')
+        try:
+            args = parser.parse_args(sub_cmd.split())
+            if hasattr(args, 'handler'):
+                args.handler(client, args)
+        except ArgumentParserError:
+            parser.print_help()
+            continue

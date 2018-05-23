@@ -23,6 +23,5 @@ Tinyftp>>>put a.txt
 ```
 
 #### Note
-* double dots path like /../ could not be resolved
 
 

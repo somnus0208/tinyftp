@@ -1,6 +1,7 @@
 import argparse
 import socket
 import struct
+import os
 RES_CMD_OK       = 1
 RES_DIR          = 2
 RES_FILE_SIZE    = 3
@@ -34,10 +35,19 @@ class TLV:
         return struct.pack('ii',self.tag,self.length)
 
 class tlvsocket:
-    
-    working_dir = None
+
     def __init__(self, family=socket.AF_INET, type=socket.SOCK_STREAM, proto=0, fileno=None):
         self._socket = socket.socket(family,type,proto,fileno)
+        self._working_dir = None
+    @property
+    def working_dir(self):
+        return None
+    @working_dir.setter
+    def working_dir(self, dir):
+        self._working_dir = os.path.normpath(dir)
+    @working_dir.getter
+    def working_dir(self):
+        return self._working_dir
     def accept(self):
         s,addr = self._socket.accept()
         tlvs = tlvsocket()

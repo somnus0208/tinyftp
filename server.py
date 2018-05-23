@@ -9,8 +9,8 @@ def thread_handler(client,addr):
         tlv = client.recv_tlv()
         if tlv.tag == tls.REQ_CLS:
             client.close()
-            break
             print('client {0} is closed'.format(addr[0]))
+            break
         elif tlv.tag == tls.REQ_W_DIR:
             print('client {0} reqesting working directory'.format(addr[0]))
             client.send_tlv(tls.TLV(tls.RES_CMD_OK,str(client.working_dir)))
@@ -85,7 +85,7 @@ if __name__=='__main__':
     print('listening at {}'.format(localip))
     while True:
         client,addr = server.accept()
-        client.working_dir = os.getcwd();
+        client.working_dir = os.getcwd()
         print('accept from {}'.format(addr))
         t = threading.Thread(target=thread_handler, args=(client,addr))
         t.start()

@@ -24,7 +24,7 @@ def command_cd(client, args):
 
 def command_lcd(client, args):
     nw_dir = client.working_dir
-    if os.path.abspath(args.param):
+    if os.path.isabs(args.param):
         nw_dir = args.param
     else:
         nw_dir = os.path.join(nw_dir,args.param)

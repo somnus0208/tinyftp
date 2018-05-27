@@ -3,8 +3,23 @@ import os
 import struct
 import threading
 import tls
+import signal
+import sys
 
-def thread_handler(client,addr):
+def server_thread_handler(ip):
+    server = tls.tlvsocket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((ip, 9000))
+    server.listen(5)
+    print('listening at {}'.format(ip))
+    while True:
+            client, addr = server.accept()
+            client.working_dir = os.getcwd()
+            print('accept from {}'.format(addr))
+            t = threading.Thread(target=thread_handler, args=(client,addr))
+            t.setDaemon(True)
+            t.start()
+
+def thread_handler(client, addr):
     while True:
         tlv = client.recv_tlv()
         if tlv.tag == tls.REQ_CLS:
@@ -76,17 +91,19 @@ def thread_handler(client,addr):
             file_object.close()
 
 
+
 if __name__=='__main__':
     
-    localip = socket.gethostbyname(socket.gethostname())
-    server = tls.tlvsocket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((localip,9000))
-    server.listen(5)
-    print('listening at {}'.format(localip))
-    while True:
-        client,addr = server.accept()
-        client.working_dir = os.getcwd()
-        print('accept from {}'.format(addr))
-        t = threading.Thread(target=thread_handler, args=(client,addr))
+    (_,_,ips) = socket.gethostbyname_ex(socket.gethostname())
+    print("(press ctrl+c to terminate)")
+    ts = []
+    for ip in ips:
+        t = threading.Thread(target=server_thread_handler, args=(ip,))
+        ts.append(t)
+        t.setDaemon(True)
         t.start()
-
+    def signal_handler(signal, frame):
+        sys.exit()
+    signal.signal(signal.SIGINT, signal_handler)
+    while True:
+        pass

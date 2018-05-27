@@ -22,6 +22,6 @@ Tinyftp>>>get a.txt
 Tinyftp>>>put a.txt
 ```
 
-#### Note
-
-
+#### TODO
+* sub thread handling
+* connection reset handling
